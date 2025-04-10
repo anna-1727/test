@@ -1,0 +1,49 @@
+body {
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    background-color: rgba(43, 118, 28, 0.492);
+    color: antiquewhite;
+    background-image: url(https://i.pinimg.com/736x/25/61/17/256117d551a7638a4cd7d5ce99791cab.jpg);
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+a {
+    color: antiquewhite;
+    background-color: rgba(0, 0, 0, 0.75);
+}
+
+h1,
+h2 {
+    text-align: center;
+}
+
+img {
+    border: 4px dotted black;
+    padding: 2px;
+    height: 225px;
+    /* margin: auto; */
+    /* display: block; */
+}
+
+.rizz {
+    font-family: cursive;
+    color: antiquewhite border: 3px solid rgb(249, 179, 255);
+    font-size: 250%;
+    font-weight: bold;
+    background-color: rgb(33, 83, 33);
+}
+
+.rizz:hover {
+    font-size: 275%;
+    color: antiquewhite;
+    border: 3px dashed rgb(249, 179, 255);
+}
+
+li {
+    width: fit-content;
+}
+
+li:hover {
+    text-decoration: underline;
+    background-color: rgba(36, 99, 23, 0.492);
+}
