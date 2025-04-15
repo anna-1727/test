@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Tic-Tac-Toe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Grid lines */
+        .large-board, .small-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 4px;
+            background-color: #374151; /* gray-700 */
+            border: 2px solid #374151;
+            border-radius: 8px;
+            touch-action: manipulation;
+        }
+
+        .large-cell, .small-cell {
+            background-color: #f3f4f6; /* gray-100 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1rem, 8vw, 3rem);
+            font-weight: bold;
+            cursor: pointer;
+            aspect-ratio: 1 / 1;
+            border-radius: 4px;
+            transition: background-color 0.2s ease-in-out;
+            position: relative;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .small-cell {
+             font-size: clamp(0.8rem, 5vw, 1.5rem);
+             min-height: 30px;
+             min-width: 30px;
+        }
+
+        /* Highlight active large cell */
+        .large-cell.active-large-board {
+            background-color: #dbeafe; /* blue-100 */
+            box-shadow: 0 0 0 3px #60a5fa; /* blue-400 */
+            z-index: 10;
+        }
+        .large-cell.active-large-board .small-cell:not(.won-x):not(.won-o):not(.draw) {
+             background-color: #eff6ff; /* blue-50 */
+        }
+
+        /* Highlight playable small cells */
+        .large-cell.active-large-board .small-cell:hover:not([data-value]):not(.won-x):not(.won-o):not(.draw) {
+            background-color: #bfdbfe; /* blue-200 */
+        }
+
+        /* Styles for won cells/boards */
+        .won-x, .won-o, .draw { cursor: not-allowed; position: relative; }
+        .won-x::after, .won-o::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            font-size: clamp(2rem, 15vw, 6rem); display: flex; justify-content: center; align-items: center;
+            background-color: rgba(209, 213, 219, 0.7); /* gray-300 semi-transparent */
+            border-radius: 4px; z-index: 5;
+        }
+        .won-x::after { content: 'X'; color: rgba(239, 68, 68, 0.8); } /* red-500 */
+        .won-o::after { content: 'O'; color: rgba(59, 130, 246, 0.8); } /* blue-500 */
+        .small-cell.won-x, .small-cell.won-o { background-color: #d1d5db; } /* gray-300 */
+        .small-cell.won-x { color: #ef4444; } /* red-500 */
+        .small-cell.won-o { color: #3b82f6; } /* blue-500 */
+        .small-cell.draw { background-color: #d1d5db; } /* gray-300 */
+        .large-cell.draw::after {
+            content: '-'; color: rgba(107, 114, 128, 0.8); /* gray-500 */
+            font-size: clamp(2rem, 15vw, 6rem); background-color: rgba(209, 213, 219, 0.7);
+        }
+
+        /* Message Box */
+        #message-box {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            padding: 10px 20px; background-color: rgba(0, 0, 0, 0.7); color: white;
+            border-radius: 8px; z-index: 100; opacity: 0;
+            transition: opacity 0.5s ease-in-out; pointer-events: none;
+        }
+        #message-box.show { opacity: 1; }
+
+        /* Buttons */
+        button { transition: background-color 0.2s ease, transform 0.1s ease; }
+        button:active { transform: scale(0.95); }
+        .hidden { display: none; }
+
+        /* Win Flash Animation */
+        @keyframes greenFlash {
+          0%, 100% { background-color: #e5e7eb; } /* gray-200 */
+          50% { background-color: rgba(74, 222, 128, 0.6); } /* green-400 */
+        }
+        .win-flash { animation: greenFlash 0.8s ease-in-out; }
+
+    </style>
+</head>
+<body class="bg-gray-200 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2 text-center">Ultimate Tic-Tac-Toe</h1>
+
+    <div id="score-display" class="text-lg font-semibold text-gray-700 mb-2 text-center">Score: X - 0 | O - 0</div>
+
+    <div id="mode-selection" class="flex flex-wrap justify-center gap-2 mb-4">
+        <button id="pvp-button" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Player vs Player</button>
+        <button id="pvc-button" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Player vs CPU</button>
+        <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Reset Game</button>
+    </div>
+
+    <div id="difficulty-selection" class="hidden flex flex-wrap justify-center gap-2 mb-4">
+         <h2 class="w-full text-center text-lg font-semibold mb-2 text-gray-700">Choose CPU Difficulty:</h2>
+        <button id="easy-button" data-difficulty="easy" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Easy</button>
+        <button id="hard-button" data-difficulty="hard" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Hard</button>
+    </div>
+
+    <div id="status" class="text-xl font-semibold text-gray-700 mb-2 h-8 text-center">Select Game Mode</div>
+
+    <div id="play-again-container" class="mb-4 h-10"> <button id="play-again-button" class="hidden bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg shadow">Play Again</button>
+    </div>
+
+    <div id="game-container" class="w-full max-w-xl md:max-w-2xl aspect-square hidden">
+        <div id="large-board" class="large-board w-full h-full">
+            </div>
+    </div>
+
+    <div id="message-box"></div>
+
+    <script>
+        // --- DOM Elements ---
+        const largeBoardElement = document.getElementById('large-board');
+        const statusElement = document.getElementById('status');
+        const scoreDisplayElement = document.getElementById('score-display'); // Score display
+        const modeSelectionDiv = document.getElementById('mode-selection');
+        const difficultySelectionDiv = document.getElementById('difficulty-selection');
+        const gameContainerDiv = document.getElementById('game-container');
+        const pvpButton = document.getElementById('pvp-button');
+        const pvcButton = document.getElementById('pvc-button');
+        const resetButton = document.getElementById('reset-button');
+        const easyButton = document.getElementById('easy-button');
+        const hardButton = document.getElementById('hard-button');
+        const playAgainButton = document.getElementById('play-again-button'); // Play Again button
+        const playAgainContainer = document.getElementById('play-again-container');
+        const messageBox = document.getElementById('message-box');
+        const bodyElement = document.body;
+
+        // --- Game State ---
+        let smallBoardStates = [];
+        let largeBoardState = [];
+        let currentPlayer = 'X';
+        let nextLargeCellIndex = null;
+        let gameMode = null;
+        let cpuDifficulty = null;
+        let gameOver = true;
+        let winner = null;
+        let scoreX = 0; // Score for X
+        let scoreO = 0; // Score for O
+
+        // --- Winning Combinations ---
+        const winningCombinations = [ /* ... combinations ... */
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]
+        ];
+
+        // --- Initialization ---
+        function setupNewGame() {
+            console.log("Setting up new game selection (Full Reset).");
+            gameMode = null; cpuDifficulty = null; gameOver = true; winner = null;
+            currentPlayer = 'X'; nextLargeCellIndex = null;
+            scoreX = 0; scoreO = 0; // Reset scores fully
+            updateScoreDisplay(); // Update display to 0-0
+            bodyElement.classList.remove('win-flash');
+
+            modeSelectionDiv.classList.remove('hidden');
+            difficultySelectionDiv.classList.add('hidden');
+            gameContainerDiv.classList.add('hidden');
+            playAgainButton.classList.add('hidden'); // Hide play again
+            largeBoardElement.innerHTML = '';
+            statusElement.textContent = "Select Game Mode";
+        }
+
+        function initGame() {
+            // Starts a new round with current settings (mode, difficulty)
+            console.log(`Initializing round: Mode=${gameMode}, Difficulty=${cpuDifficulty}`);
+            gameOver = false; winner = null; currentPlayer = 'X'; nextLargeCellIndex = null;
+            bodyElement.classList.remove('win-flash');
+            updateScoreDisplay(); // Ensure score display is current at round start
+
+            smallBoardStates = Array(9).fill(null).map(() => Array(9).fill(null));
+            largeBoardState = Array(9).fill(null);
+
+            largeBoardElement.innerHTML = '';
+            // Generate board cells (same as before)
+            for (let i = 0; i < 9; i++) {
+                const largeCell = document.createElement('div'); largeCell.classList.add('large-cell', 'bg-gray-100', 'rounded'); largeCell.dataset.largeIndex = i;
+                const smallBoard = document.createElement('div'); smallBoard.classList.add('small-board'); smallBoard.dataset.largeIndex = i;
+                for (let j = 0; j < 9; j++) { const smallCell = document.createElement('div'); smallCell.classList.add('small-cell', 'bg-gray-100', 'rounded'); smallCell.dataset.largeIndex = i; smallCell.dataset.smallIndex = j; smallCell.addEventListener('click', handleCellClick); smallBoard.appendChild(smallCell); }
+                largeCell.appendChild(smallBoard); largeBoardElement.appendChild(largeCell);
+            }
+
+            modeSelectionDiv.classList.add('hidden');
+            difficultySelectionDiv.classList.add('hidden');
+            gameContainerDiv.classList.remove('hidden');
+            playAgainButton.classList.add('hidden'); // Hide play again at start of round
+
+            updateStatusDisplay();
+            updateBoardHighlights();
+            console.log("Round Initialized. Current Player:", currentPlayer);
+        }
+
+        // --- Event Handlers ---
+        pvpButton.addEventListener('click', () => { gameMode = 'pvp'; cpuDifficulty = null; scoreX = 0; scoreO = 0; initGame(); }); // Reset score on mode change
+        pvcButton.addEventListener('click', () => {
+            modeSelectionDiv.classList.add('hidden');
+            difficultySelectionDiv.classList.remove('hidden');
+            statusElement.textContent = "Select Difficulty";
+            scoreX = 0; scoreO = 0; // Reset score when selecting PvC mode
+            updateScoreDisplay();
+        });
+        easyButton.addEventListener('click', () => { gameMode = 'pvc'; cpuDifficulty = 'easy'; initGame(); });
+        hardButton.addEventListener('click', () => { gameMode = 'pvc'; cpuDifficulty = 'hard'; initGame(); });
+        resetButton.addEventListener('click', () => { setupNewGame(); showMessage("Game Reset. Select a mode."); });
+        playAgainButton.addEventListener('click', () => {
+            console.log("Play Again clicked.");
+            initGame(); // Restart round with same settings
+        });
+
+
+        function handleCellClick(event) {
+            // ... (validation logic remains the same) ...
+            if (gameOver || (gameMode === 'pvc' && currentPlayer === 'O')) return;
+            const smallCell = event.target;
+            if (!smallCell.classList.contains('small-cell')) return;
+            const largeIndex = parseInt(smallCell.dataset.largeIndex);
+            const smallIndex = parseInt(smallCell.dataset.smallIndex);
+            if (smallBoardStates[largeIndex][smallIndex] || largeBoardState[largeIndex] || (nextLargeCellIndex !== null && largeIndex !== nextLargeCellIndex)) {
+                if (smallBoardStates[largeIndex][smallIndex]) showMessage("Cell already taken!");
+                else if (largeBoardState[largeIndex]) showMessage("This board is already finished!");
+                else showMessage(`You must play in the highlighted board!`);
+                return;
+            }
+
+            makeMove(largeIndex, smallIndex, currentPlayer);
+
+            if (!gameOver && gameMode === 'pvc' && currentPlayer === 'O') {
+                setTimeout(cpuMove, 500);
+            }
+        }
+
+        // --- Core Move Logic ---
+        function makeMove(largeIndex, smallIndex, player) {
+             // ... (start of makeMove remains the same) ...
+             console.log(`Making Move: Player=${player}, Large=${largeIndex}, Small=${smallIndex}`);
+             if (gameOver || smallBoardStates[largeIndex][smallIndex] || largeBoardState[largeIndex]) { console.warn(`Invalid move attempt`); return; }
+             smallBoardStates[largeIndex][smallIndex] = player;
+             const smallCellElement = largeBoardElement.querySelector(`.large-cell[data-large-index="${largeIndex}"]`)?.querySelector(`.small-cell[data-small-index="${smallIndex}"]`);
+             if (smallCellElement) { smallCellElement.textContent = player; smallCellElement.classList.add(player === 'X' ? 'text-red-500' : 'text-blue-500'); smallCellElement.dataset.value = player; }
+             else { console.error("Could not find small cell element"); return; }
+
+             // --- Check for Small Board Win/Draw ---
+             const smallWinInfo = checkWin(smallBoardStates[largeIndex]);
+             if (smallWinInfo.winner || smallWinInfo.isDraw) {
+                 const result = smallWinInfo.winner || 'draw';
+                 largeBoardState[largeIndex] = result;
+                 markLargeCellAsWon(largeIndex, result);
+
+                 // Check for Large Board Win/Draw immediately
+                 const largeWinInfo = checkWin(largeBoardState);
+                  if (largeWinInfo.winner || largeWinInfo.isDraw) {
+                     winner = largeWinInfo.winner || 'draw';
+                     console.log(`Game Over! Result: ${winner}`);
+                     gameOver = true;
+
+                     // --- Update Score ---
+                     if (winner === 'X') scoreX++;
+                     else if (winner === 'O') scoreO++;
+                     updateScoreDisplay(); // Update score display
+                     // --- End Update Score ---
+
+                     updateStatusDisplay();
+                     updateBoardHighlights(); // Remove highlights
+                     showMessage(winner === 'draw' ? "It's a draw!" : `Player ${winner} wins the game!`);
+                     playAgainButton.classList.remove('hidden'); // Show Play Again button
+
+                     if (largeWinInfo.winner) { triggerWinFlash(); }
+                     return; // Stop processing this turn
+                 }
+             }
+
+             // --- Determine Next Move's Large Cell (if game continues) ---
+             // ... (logic remains the same) ...
+             const potentialNextLargeIndex = smallIndex;
+             if (largeBoardState[potentialNextLargeIndex]) { nextLargeCellIndex = null; }
+             else { nextLargeCellIndex = potentialNextLargeIndex; }
+
+             // --- Switch Player ---
+             currentPlayer = player === 'X' ? 'O' : 'X';
+             updateStatusDisplay();
+             updateBoardHighlights();
+        }
+
+        // --- CPU Logic ---
+        function cpuMove() { /* ... CPU logic remains the same ... */
+             if (gameOver) return;
+            console.log(`CPU's turn (O). Difficulty: ${cpuDifficulty}. Required Large Cell: ${nextLargeCellIndex}`);
+            let bestMove = null;
+            let potentialBlockingMove = null;
+
+            // --- Strategy for Specific Target Board ---
+            if (nextLargeCellIndex !== null && !largeBoardState[nextLargeCellIndex]) {
+                const targetBoard = smallBoardStates[nextLargeCellIndex];
+                const availableIndices = [];
+                for (let i = 0; i < 9; i++) { if (!targetBoard[i]) availableIndices.push(i); }
+                console.log(`CPU analyzing target board ${nextLargeCellIndex}. Available:`, availableIndices);
+                if (availableIndices.length > 0) {
+                    const cpuHasPlayedHere = targetBoard.includes('O');
+                    // 1. Check Win
+                    for (const index of availableIndices) { const tempBoard = [...targetBoard]; tempBoard[index] = 'O'; if (checkWin(tempBoard).winner === 'O') { bestMove = { largeIndex: nextLargeCellIndex, smallIndex: index }; console.log("CPU Found Winning Move:", bestMove); break; } }
+                    // 2. Check Block
+                    if (!bestMove) {
+                        for (const index of availableIndices) { const tempBoard = [...targetBoard]; tempBoard[index] = 'X'; if (checkWin(tempBoard).winner === 'X') { potentialBlockingMove = { largeIndex: nextLargeCellIndex, smallIndex: index }; console.log("CPU Found Potential Blocking Move:", potentialBlockingMove); break; } }
+                        if (potentialBlockingMove) { const shouldBlock = (cpuDifficulty === 'hard') || (cpuDifficulty === 'easy' && Math.random() < 0.34); if (shouldBlock) { bestMove = potentialBlockingMove; console.log(`CPU Difficulty=${cpuDifficulty}. Decided TO block.`); } else { console.log(`CPU Difficulty=${cpuDifficulty}. Decided NOT to block.`); } }
+                    }
+                    // 3. Strategic/Random
+                    if (!bestMove) { if (!cpuHasPlayedHere) { const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]; bestMove = { largeIndex: nextLargeCellIndex, smallIndex: randomIndex }; console.log(`CPU First move in board ${nextLargeCellIndex}. Choosing randomly.`); } else { if (availableIndices.includes(4)) { bestMove = { largeIndex: nextLargeCellIndex, smallIndex: 4 }; console.log("CPU Taking Center:", bestMove); } else { const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]; bestMove = { largeIndex: nextLargeCellIndex, smallIndex: randomIndex }; console.log("CPU Choosing Random Strategic Fallback:", bestMove); } } }
+                } else { nextLargeCellIndex = null; } // No moves, force play anywhere
+                if (!bestMove && availableIndices.length === 0) { nextLargeCellIndex = null; } // No moves, force play anywhere
+            }
+
+            // --- Strategy for "Play Anywhere" ---
+            if (nextLargeCellIndex === null) {
+                 console.log("CPU can play anywhere.");
+                 const allAvailableMoves = []; potentialBlockingMove = null;
+                 for (let i = 0; i < 9; i++) { if (!largeBoardState[i]) { const currentSmallBoard = smallBoardStates[i]; for (let j = 0; j < 9; j++) { if (!currentSmallBoard[j]) { const move = { largeIndex: i, smallIndex: j }; allAvailableMoves.push(move); if (!potentialBlockingMove) { const tempBoard = [...currentSmallBoard]; tempBoard[j] = 'X'; if (checkWin(tempBoard).winner === 'X') { potentialBlockingMove = move; console.log("CPU Found Potential Blocking Move (Anywhere):", potentialBlockingMove); } } } } } }
+                 if (potentialBlockingMove) { const shouldBlock = (cpuDifficulty === 'hard') || (cpuDifficulty === 'easy' && Math.random() < 0.34); if (shouldBlock) { bestMove = potentialBlockingMove; console.log(`CPU Difficulty=${cpuDifficulty}. Decided TO block (Anywhere).`); } else { console.log(`CPU Difficulty=${cpuDifficulty}. Decided NOT to block (Anywhere).`); const indexToRemove = allAvailableMoves.findIndex(m => m.largeIndex === potentialBlockingMove.largeIndex && m.smallIndex === potentialBlockingMove.smallIndex); if (indexToRemove > -1) allAvailableMoves.splice(indexToRemove, 1); } }
+                 if (!bestMove && allAvailableMoves.length > 0) { bestMove = allAvailableMoves[Math.floor(Math.random() * allAvailableMoves.length)]; console.log("CPU Choosing Randomly Anywhere:", bestMove); }
+            }
+
+            // --- Execute Move ---
+            if (bestMove) { makeMove(bestMove.largeIndex, bestMove.smallIndex, 'O'); }
+            else { console.error("CPU could not find any valid move."); const isBoardFull = largeBoardState.every(s => s !== null) && largeBoardState.every((ls, lIdx) => ls || smallBoardStates[lIdx].every(ss => ss !== null)); if (checkWin(largeBoardState).isDraw || isBoardFull) { winner = 'draw'; gameOver = true; updateStatusDisplay(); showMessage("It's a draw! (No moves left)"); playAgainButton.classList.remove('hidden'); } else { showMessage("Error: CPU failed to find a move."); } } // Show play again on draw too
+        }
+
+        // --- Win/Draw Checking ---
+        function checkWin(boardState) { /* ... checkWin logic remains the same ... */
+            let winner = null;
+            for (const combo of winningCombinations) { const [a, b, c] = combo; if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) { winner = boardState[a]; break; } }
+            const isDraw = !winner && boardState.every(cell => cell !== null);
+            return { winner, isDraw };
+        }
+
+        // --- UI Updates ---
+        function updateStatusDisplay() { /* ... logic remains the same ... */
+             if (gameOver) {
+                 if (winner === 'draw') statusElement.textContent = "Game Over: It's a Draw!";
+                 else if (winner) statusElement.textContent = `Game Over: Player ${winner} Wins!`;
+                 else statusElement.textContent = "Select Game Mode"; // Initial state
+             } else {
+                 const playerText = (gameMode === 'pvc' && currentPlayer === 'O') ? `CPU (${cpuDifficulty})` : `Player ${currentPlayer}`;
+                 statusElement.textContent = `${playerText}'s Turn`;
+                 if (nextLargeCellIndex !== null && !largeBoardState[nextLargeCellIndex]) { statusElement.textContent += ` - Play in highlighted board`; }
+                 else { statusElement.textContent += ` - Play anywhere`; }
+             }
+         }
+
+        function updateBoardHighlights() { /* ... logic remains the same ... */
+            document.querySelectorAll('.large-cell.active-large-board').forEach(cell => { cell.classList.remove('active-large-board'); cell.querySelectorAll('.small-cell').forEach(sc => sc.classList.remove('hover:bg-blue-200')); });
+            if (gameOver) return;
+            let boardsToHighlight = [];
+            if (nextLargeCellIndex !== null && !largeBoardState[nextLargeCellIndex]) { boardsToHighlight.push(nextLargeCellIndex); }
+            else { for (let i = 0; i < 9; i++) { if (!largeBoardState[i]) boardsToHighlight.push(i); } }
+            boardsToHighlight.forEach(index => { const activeLargeCell = largeBoardElement.querySelector(`.large-cell[data-large-index="${index}"]`); if (activeLargeCell) { activeLargeCell.classList.add('active-large-board'); activeLargeCell.querySelectorAll('.small-cell').forEach(sc => { const largeIdx = parseInt(sc.dataset.largeIndex); const smallIdx = parseInt(sc.dataset.smallIndex); if (!smallBoardStates[largeIdx][smallIdx]) { sc.classList.add('hover:bg-blue-200'); } }); } });
+        }
+
+        function markLargeCellAsWon(largeIndex, player) { /* ... logic remains the same ... */
+            const largeCell = largeBoardElement.querySelector(`.large-cell[data-large-index="${largeIndex}"]`); if (!largeCell) return;
+            const smallBoard = largeCell.querySelector('.small-board'); if (smallBoard) smallBoard.style.display = 'none';
+            largeCell.classList.remove('active-large-board', 'hover:bg-blue-200');
+            largeCell.classList.add(player === 'draw' ? 'draw' : `won-${player.toLowerCase()}`);
+            largeCell.style.backgroundColor = '#e5e7eb';
+        }
+
+        // --- Utility Functions ---
+        function showMessage(msg, duration = 2500) { /* ... logic remains the same ... */
+             messageBox.textContent = msg; messageBox.classList.add('show');
+             if (messageBox.timeoutId) clearTimeout(messageBox.timeoutId);
+             messageBox.timeoutId = setTimeout(() => { messageBox.classList.remove('show'); messageBox.timeoutId = null; }, duration);
+         }
+
+        function triggerWinFlash() { /* ... logic remains the same ... */
+            console.log("Triggering win flash effect.");
+            bodyElement.classList.add('win-flash');
+            setTimeout(() => { bodyElement.classList.remove('win-flash'); }, 800);
+        }
+
+        // --- New Function: Update Score Display ---
+        function updateScoreDisplay() {
+            scoreDisplayElement.textContent = `Score: X - ${scoreX} | O - ${scoreO}`;
+        }
+
+        // --- Initial Setup on Load ---
+        setupNewGame();
+        console.log("Ultimate Tic-Tac-Toe script loaded (Score & Play Again V1).");
+
+    </script>
+
+</body>
+</html>
